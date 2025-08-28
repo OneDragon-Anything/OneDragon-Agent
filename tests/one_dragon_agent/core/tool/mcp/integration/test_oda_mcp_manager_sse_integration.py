@@ -10,6 +10,7 @@ import threading
 
 import pytest
 import pytest_asyncio
+import uvicorn
 from google.adk.agents import LlmAgent
 from google.adk.events import Event
 from google.adk.models.lite_llm import LiteLlm
@@ -41,8 +42,17 @@ def get_free_port():
 
 
 # Create MCP server with dynamic port
-port = get_free_port()
-mcp = FastMCP("weather-mcp-server", port=port)
+sse_port = get_free_port()
+mcp = FastMCP("sse-mcp-server", port=sse_port)
+# copy mcp.run_sse_async()
+starlette_app = mcp.sse_app()
+config = uvicorn.Config(
+    starlette_app,
+    host=mcp.settings.host,
+    port=mcp.settings.port,
+    log_level=mcp.settings.log_level.lower(),
+)
+server = uvicorn.Server(config)
 
 # Fixed weather data for testing purposes
 WEATHER_DATA = {
@@ -131,16 +141,14 @@ class TestOdaMcpManagerSSEIntegration:
             dict: Complete test setup including OdaAgent and SSE MCP configuration
         """
         def run_server():
-            import asyncio
-            # 使用asyncio.run()运行异步函数
-            asyncio.run(mcp.run_sse_async())
+            asyncio.run(server.serve())
 
         # 启动服务器线程
         server_thread = threading.Thread(target=run_server, daemon=True)
         server_thread.start()
 
         # 给服务器一些启动时间
-        await wait_for_server('localhost', port)
+        await wait_for_server('localhost', sse_port)
 
         # Create OdaMcpManager with in-memory storage
         storage = InMemoryOdaMcpStorage()
@@ -154,7 +162,7 @@ class TestOdaMcpManagerSSEIntegration:
             name="SSE Weather MCP Server",
             description="SSE MCP server with weather functionality",
             server_type="sse",
-            url=f"http://localhost:{port}/sse",
+            url=f"http://localhost:{sse_port}/sse",
             timeout=30
         )
 
@@ -180,6 +188,11 @@ class TestOdaMcpManagerSSEIntegration:
             "mcp_id": "sse_weather_server",
             "model_config_manager": model_config_manager
         }
+
+        # 设置退出标志
+        server.should_exit = True
+        server.force_exit = True
+        await server.shutdown()
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(120)

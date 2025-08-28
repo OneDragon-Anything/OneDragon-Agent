@@ -6,10 +6,12 @@ can properly process messages and return event streams from OdaAgent.
 
 import asyncio
 import os
+import socket
 import threading
 
 import pytest
 import pytest_asyncio
+import uvicorn
 from google.adk.artifacts import InMemoryArtifactService
 from google.adk.events import Event
 from google.adk.memory import InMemoryMemoryService
@@ -76,8 +78,27 @@ def get_weather(city: str) -> str:
     return f"Weather in {city}: {weather}"
 
 
-# Create MCP server for province information
-mcp = FastMCP("province-mcp-server", port=8889)
+def get_free_port():
+    """获取一个可用的端口"""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('localhost', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
+
+
+# Create MCP server with dynamic port
+sse_port = get_free_port()
+mcp = FastMCP("sse-mcp-server", port=sse_port)
+# copy mcp.run_sse_async()
+starlette_app = mcp.sse_app()
+config = uvicorn.Config(
+    starlette_app,
+    host=mcp.settings.host,
+    port=mcp.settings.port,
+    log_level=mcp.settings.log_level.lower(),
+)
+server = uvicorn.Server(config)
 
 
 @mcp.tool(
@@ -158,16 +179,14 @@ class TestOdaSessionProcessMessageIntegration:
             dict: Complete test setup including all required services and managers
         """
         def run_server():
-            import asyncio
-            # 使用asyncio.run()运行异步函数
-            asyncio.run(mcp.run_sse_async())
+            asyncio.run(server.serve())
 
         # 启动服务器线程
         server_thread = threading.Thread(target=run_server, daemon=True)
         server_thread.start()
 
         # 给服务器一些启动时间
-        await wait_for_server('localhost', 8889)
+        await wait_for_server('localhost', sse_port)
 
         # Create ADK native services
         session_service = InMemorySessionService()
@@ -196,8 +215,8 @@ class TestOdaSessionProcessMessageIntegration:
             name="Test MCP Server",
             description="Test MCP server for integration testing",
             server_type="sse",
-            url="http://localhost:8889/sse",
-            timeout=30
+            url=f"http://localhost:{sse_port}/sse",
+            timeout=30,
         )
         await mcp_manager.register_custom_config(mcp_config)
         
@@ -265,6 +284,11 @@ class TestOdaSessionProcessMessageIntegration:
             "mcp_manager": mcp_manager,
             "agent_config_manager": agent_config_manager
         }
+
+        # 设置退出标志
+        server.should_exit = True
+        server.force_exit = True
+        await server.shutdown()
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(120)
