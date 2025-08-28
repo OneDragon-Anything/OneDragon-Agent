@@ -1,0 +1,102 @@
+[project]
+name = "onedragon-agent"
+version = "0.1.0"
+description = "A universal intelligent agent framework for building AI agents"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "DoctorReid", email = "doctorreid2024@outlook.com"},
+]
+dependencies = [
+    "httpx==0.28.1",
+    "pydantic==2.11.7",
+    "watchdog>=6.0.0",
+    "pathspec>=0.12.1",
+    "google-adk==1.12.0",
+    "litellm>=1.75.9",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==8.4.1",
+    "pytest-asyncio==1.1.0",
+    "pytest-timeout>=2.4.0",
+    "mkdocs>=1.6.1",
+    "mkdocstrings[python]>=0.30.0",
+    "ruff>=0.12.9",
+    "mypy>=1.17.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]  # 告诉 setuptools 去 src 目录下寻找包
+
+[tool.ruff]
+# 与 Black 代码格式化工具保持一致的配置
+# 设置每行最大长度为 88 个字符
+line-length = 88
+# 设置缩进宽度为 4 个空格
+indent-width = 4
+
+# 指定目标 Python 版本为 3.11
+target-version = "py311"
+
+[tool.ruff.lint]
+# 启用基础的错误检查规则
+# E4: 导入相关错误
+# E7: 语句相关错误
+# E9: 运行时错误
+# F: Pyflakes 错误 (未定义变量、重复定义等)
+select = ["E4", "E7", "E9", "F"]
+
+# 扩展选择更多代码质量检查规则
+extend-select = [
+    "I",    # isort - 导入语句排序和格式化
+    "UP",   # pyupgrade - 检测可以使用新 Python 语法的地方
+    "B",    # flake8-bugbear - 发现潜在的 bug 和设计问题
+    "C4",   # flake8-comprehensions - 列表/字典/集合推导式的优化建议
+    "DTZ",  # flake8-datetimez - 时区相关问题检查
+    "EXE",  # flake8-executable - 可执行文件相关检查
+    "G",    # flake8-logging-format - 日志格式化检查
+    "ICN",  # flake8-import-conventions - 导入命名约定检查
+    "ISC",  # flake8-implicit-str-concat - 隐式字符串连接检查
+    "N",    # pep8-naming - 命名规范检查
+    "PGH",  # pygrep-hooks - 常见问题模式检查
+    "PIE",  # flake8-pie - 避免某些 Python 反模式
+    "PL",   # pylint - 更全面的代码质量检查
+    "PT",   # flake8-pytest-style - pytest 测试风格检查
+    "PYI",  # flake8-pyi - Python 类型提示文件检查
+    "RUF",  # Ruff-specific rules - Ruff 特有的规则
+    "S",    # flake8-bandit - 安全相关问题检查
+    "SIM",  # flake8-simplify - 代码简化建议
+    "TID",  # flake8-tidy-imports - 导入语句规范检查
+    "TCH",  # flake8-type-checking - 类型检查导入优化
+]
+
+per-file-ignores = { "*" = ["PLR0913"] }  # Too many arguments in function definition
+
+[tool.ruff.lint.flake8-tidy-imports]
+# 禁止相对导入，强制使用绝对导入（适合发布到 PyPI 的包）
+ban-relative-imports = "all"
+
+[tool.ruff.lint.isort]
+# 移除 relative-imports-order 配置
+known-first-party = ["one_dragon_agent"]
+force-single-line = false
+
+[tool.mypy]
+python_version = "3.11"
+incremental = true
+sqlite_cache = true
+warn_return_any = true  # 当函数返回 Any 类型时发出警告
+warn_unused_configs = true  # 检查配置文件中的每个配置项是否实际应用到了代码检查中
+disallow_untyped_defs = true  # 要求所有函数都必须有类型注解，不允许无类型定义
+disallow_incomplete_defs = true  # 要求函数的所有参数都必须有类型注解
+check_untyped_defs = true  # 即使函数没有类型注解，也会检查其内部代码
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/one_dragon_agent"]
